@@ -18,13 +18,12 @@ module adder_tester();
         $dumpvars(0, dut);
         a = 32'd1;
         b = 32'd2;
-        $display(c);
         #10;
-        a = 32'd5;
-        b = 32'd10;
         if (c != 32'd3) begin
             $display("FAILED");
         end
+        a = 32'd5;
+        b = 32'd10;
         #10;
         $finish();
     end

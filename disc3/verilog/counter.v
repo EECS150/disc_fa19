@@ -8,7 +8,10 @@ module counter(
     reg [3:0] count;
     always @(posedge clk) begin
         if (rst) count <= 'd0;
-        else count <= count + 'd1;
+        else begin
+            count <= count + 'd1;
+            $display("count = %d", count);
+        end
     end
 endmodule
 
