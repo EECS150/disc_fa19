@@ -1,0 +1,267 @@
+\documentclass[12pt,aspectratio=169]{beamer}
+
+\usetheme{metropolis}
+\setbeamertemplate{bibliography item}{\insertbiblabel}
+\usepackage{xcolor}
+\usepackage{appendixnumberbeamer}
+\usepackage{verbatim}
+\usepackage{caption}
+\usepackage{minted}
+\setsansfont[BoldFont={Fira Sans Bold}, ItalicFont={Fira Sans Italic}]{Fira Sans Regular}
+\usepackage[backend=biber,style=ieee]{biblatex}
+\usepackage{hyperref}
+\usepackage{circuitikz}
+\ctikzset{tripoles/pmos style/emptycircle}
+\ctikzset{tripoles/mos style/arrows}
+\graphicspath{{./figs/}}
+\setlength{\belowcaptionskip}{-10pt}
+\setbeamersize{text margin left=5mm,text margin right=7mm}
+
+\title{EECS 151/251A: Discussion 3}
+\subtitle{Verilog Simulation, Parameterized Modules}
+\author{}
+\date{9/12/2019}
+
+\begin{document}
+\begin{frame}
+    \maketitle
+\end{frame}
+
+\begin{frame}[fragile]{Simulation Basics}
+Let's test a very simple Verilog module.
+  \begin{columns}
+    \begin{column}{0.5\textwidth}
+      \begin{center}
+      \begin{minted}{verilog}
+    module adder(
+        input [31:0] a,
+        input [31:0] b,
+        output [31:0] c
+    );
+        assign c = a + b;
+    endmodule
+      \end{minted}
+      \end{center}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \begin{itemize}
+        \item The \verb|adder| module is \textit{synthesizable}; it belongs on an ASIC or FPGA
+        \item In a testbench, we refer to the \verb|adder| module as the \textit{DUT} (device under test)
+        \item Note Verilog's truncation rules: \verb|a + b| produces a 33 bit number, which is truncated to 32 bits when assigned to \verb|c|
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{The Testbench}
+  \begin{center}
+    \begin{minted}[fontsize=\small]{verilog}
+module adder_tester();
+  reg [31:0] a, b;
+  wire [31:0] c;
+  adder dut (.a(a), .b(b), .c(c)); // device under test
+  // ... initial block of adder_tester
+endmodule
+  \end{minted}
+  \begin{itemize}
+    \item The \verb|adder_tester| module is \textbf{NOT} \textit{synthesizable}; it is executed by an \textit{RTL simulator}
+    \item Note we have created \verb|reg| nets to drive the DUT's inputs and \verb|wire| nets to sense the DUT's outputs
+  \end{itemize}
+  \end{center}
+\end{frame}
+
+\begin{frame}[fragile]{Testbench Initial Block}
+  \begin{columns}
+    \begin{column}{0.5\textwidth}
+      \begin{center}
+        \begin{minted}[fontsize=\footnotesize]{verilog}
+initial begin
+    a = 32'd1;
+    b = 32'd2;
+    #1;
+    if (c != 32'd3) begin
+        $display("FAILED");
+    end
+    a = 32'd5;
+    b = 32'd10;
+    #1;
+    $finish();
+end
+      \end{minted}
+      \end{center}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \begin{itemize}
+        \item The \verb|initial| block defines the `entry point' of the simulator
+        \item The code in the \verb|initial| block is run \textit{sequentially}, just like software
+        \item The DUT is driven using blocking (=) assignments
+        \item \verb|#(n);| is used to advance simulation time by \verb|n| timesteps
+        \item \verb|$display| and \verb|$finish| are system functions
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Timescales and Timesteps}
+  \begin{center}
+    \begin{minted}[fontsize=\small]{verilog}
+`timescale 1ns/10ps
+`timescale (simulation time step)/(simulation time resolution)
+    \end{minted}
+    \begin{itemize}
+      \item At the top of each testbench, there's a \verb|`timescale| declaration
+      \item The simulation time step defines how much time is advanced when running \verb|#1;|
+      \item The simulation time resolution defines the smallest amount time can be advanced
+      \item In the example, \verb|#1;| = 1ns and \verb|#0.010;| is the smallest delay possible
+    \end{itemize}
+  \end{center}
+\end{frame}
+
+\begin{frame}[fragile]{Adder Testbench Demo}
+  \begin{block}{Demo}
+    Run through the adder testbench. See the waveform and play with time delays.
+  \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{4-State Signals in Verilog}
+    \begin{minted}[fontsize=\footnotesize]{verilog}
+module counter(input clk);
+    reg [3:0] count;
+    always @(posedge clk) begin
+        count <= count + 'd1;
+    end
+endmodule
+    \end{minted}
+  \begin{itemize}
+    \item All \textit{registers} begin with an initial value of `x' in simulation unless otherwise specified
+    \item Every signal in Verilog has 4 potential states: 0, 1, `x` (unknown), `z' (high-impedance/unconnected)
+    \item We can set initial values of \textit{registers} with \verb|initial count = 0|
+    \item Initial values are synthesizable on some FPGAs but not on ASICs, so using a \verb|reset| is recommended
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Simulation Constructs}
+  Wait for 2 rising edges of \verb|signal|:
+  \begin{center}
+    \begin{minted}[fontsize=\footnotesize]{verilog}
+@(posedge signal);
+@(posedge signal);
+    \end{minted}
+  \end{center}
+
+  Wait for 10 rising \verb|clk| edges:
+  \begin{center}
+    \begin{minted}[fontsize=\footnotesize]{verilog}
+repeat (10) @(posedge clk);
+    \end{minted}
+  \end{center}
+
+  Generate a clock signal:
+  \begin{minted}[fontsize=\footnotesize]{verilog}
+reg clk;
+initial clk = 0;
+always #(10) clk <= ~clk;
+  \end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{\$display}
+  The \verb|$display()| system function is similar to \verb|printf()| in C.
+    \begin{minted}[fontsize=\footnotesize]{verilog}
+$display("Wire x in decimal is %d", x);
+$display("Wire x in binary is %b", x);
+    \end{minted}
+
+  \verb|$display()| can be used in \verb|initial| blocks as well as inside RTL.
+  \begin{minted}[fontsize=\footnotesize]{verilog}
+module x(input clk, input valid, input data);
+  always @(posedge clk) begin
+    if (valid) $display("Data is %d", data);
+  end
+endmodule
+  \end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{Counter Demo}
+  \begin{block}{Demo}
+    Run through the counter testbench. Deal with unknown values, initialize registers, add a reset. Use \verb|$display| in the DUT.
+  \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{Generate Macros}
+  Generate macros (\verb|generate for| and \verb|generate if|) can be used to programmatically instantiate hardware.
+  Stamp out \verb|n| instances of \verb|mod| and connected them to wires \verb|k| and \verb|s|.
+  \begin{minted}[fontsize=\footnotesize]{verilog}
+genvar i;
+generate for (i = 0; i < n; i = i + 1) begin
+  mod name(.a(s[i]), .b(k[i+1]));
+end endgenerate
+  \end{minted}
+
+  If there's a module parameter \verb|fast_mult| to choose multiplication speed
+  \begin{minted}[fontsize=\footnotesize]{verilog}
+generate if (fast_mult == 1)
+  assign c = a * b;
+else
+  shift_and_add_mult(.a(a), .b(b), .c(c));
+endgenerate
+  \end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{Shift Register Example}
+  \begin{block}{Demo}
+    Run through the shift register testbench. Work through the generate-for statement.
+  \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{Parameterized Modules}
+  Modules can have integer parameters to make them `generators':
+  \begin{minted}[fontsize=\footnotesize]{verilog}
+module adder #(parameter width=32)
+  (input [width-1:0] a,
+   input [width-1:0] b,
+   output [width:0] s);
+   assign s = a + b;
+endmodule
+  \end{minted}
+
+  This adder can be re-used with different parameterizations:
+  \begin{minted}[fontsize=\footnotesize]{verilog}
+wire [31:0] a32, b32; wire [32:0] c1;
+wire [63:0] a64, b64; wire [64:0] c2;
+adder #(.width(32)) adder1 (.a(a32), .b(b32), .c(c1));
+adder #(.width(64)) adder2 (.a(a64), .b(b64), .c(c2));
+  \end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{Shift Register Example}
+  \begin{block}{Demo}
+    Make the shift register a parameterized module.
+  \end{block}
+\end{frame}
+
+\begin{frame}{Exhaustive Testing}
+  \begin{block}{Demo}
+    A small adder can be tested exhaustively using nested for loops.
+  \end{block}
+\end{frame}
+
+\begin{frame}{Randomized Testing}
+  \begin{block}{Demo}
+    A large adder can't be tested exhaustively since it would take too much time. Instead test it using random stimulus.
+  \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{2D Regs + Memories}
+  \begin{minted}[fontsize=\footnotesize]{verilog}
+    // A memory structure that has eight 32-bit elements
+    reg [31:0] fifo_ram [7:0];
+    fifo_ram[2] // The 3rd 32-bit element
+    fifo_ram[5][7:0] // The lowest byte of the 6th 32-bit element
+  \end{minted}
+
+  \begin{block}{Demo}
+    Test the simple memory!
+  \end{block}
+\end{frame}
+
+\end{document}
